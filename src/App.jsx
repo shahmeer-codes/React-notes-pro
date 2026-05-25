@@ -1,133 +1,149 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { v4 as uuidv4 } from "uuid";
+
+import Navbar from "./components/Navbar";
+import NoteForm from "./components/NoteForm";
+import SearchBar from "./components/SearchBar";
+import NoteCard from "./components/NoteCard";
+import EmptyState from "./components/EmptyState";
 
 const App = () => {
-  const [task, settask] = useState("");
-  const [detail, setdetail] = useState("");
-  const [arr, setarr] = useState([]);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("Personal");
 
-  function sub(e) {
+  // FIXED: Load notes directly from localStorage
+  const [notes, setNotes] = useState(() => {
+    const savedNotes = localStorage.getItem("notes");
+    return savedNotes ? JSON.parse(savedNotes) : [];
+  });
+
+  const [editId, setEditId] = useState(null);
+
+  // Save notes to localStorage whenever notes change
+  useEffect(() => {
+    localStorage.setItem("notes", JSON.stringify(notes));
+  }, [notes]);
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (task == "" || detail == "") {
-      alert("Please Enter data compleletly....");
-    } else {
-      setarr([...arr, { head: task, body: detail }]);
-      setdetail("");
-      settask("");
+
+    if (!title || !description) {
+      toast.error("Please fill all fields");
+      return;
     }
-  }
-  function del(k) {
-    setarr(
-      arr.filter((_, index) => {
-        return index !== k;
-      }),
+
+    if (editId) {
+      const updatedNotes = notes.map((note) =>
+        note.id === editId
+          ? {
+              ...note,
+              title,
+              description,
+              category,
+            }
+          : note
+      );
+
+      setNotes(updatedNotes);
+      setEditId(null);
+      toast.success("Note Updated");
+    } else {
+      const newNote = {
+        id: uuidv4(),
+        title,
+        description,
+        category,
+        pinned: false,
+        createdAt: new Date().toLocaleString(),
+      };
+
+      setNotes([newNote, ...notes]);
+      toast.success("Note Added");
+    }
+
+    // Reset form
+    setTitle("");
+    setDescription("");
+    setCategory("Personal");
+  };
+
+  const handleDelete = (id) => {
+    const confirmDelete = window.confirm("Delete this note?");
+
+    if (!confirmDelete) return;
+
+    setNotes(notes.filter((note) => note.id !== id));
+    toast.success("Note Deleted");
+  };
+
+  const handleEdit = (note) => {
+    setTitle(note.title);
+    setDescription(note.description);
+    setCategory(note.category);
+    setEditId(note.id);
+  };
+
+  const togglePin = (id) => {
+    const updatedNotes = notes.map((note) =>
+      note.id === id
+        ? {
+            ...note,
+            pinned: !note.pinned,
+          }
+        : note
     );
-  }
-  function slc(l) {
-    l.preventDefault();
-    localStorage.setItem("user", JSON.stringify(arr));
-  }
-  function clr(c) {
-    c.preventDefault();
-    localStorage.clear();
-  }
-  function retrive(r) {
-    r.preventDefault();
-    const u = JSON.parse(localStorage.getItem("user") || "[]");
-    const brr = [...u, ...arr];
-    if (u == "") {
-      alert("No record in local storage...!");
-    } else {
-      setarr(brr);
-    }
-  }
+
+    setNotes(updatedNotes);
+  };
+
+  // Filter + sort notes
+  const filteredNotes = notes
+    .filter((note) =>
+      note.title.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => b.pinned - a.pinned);
+
   return (
-    <>
-      <h1 className="h-20 w-full flex justify-center items-center text-2xl text-white font-bold">
-        Notes generator
-      </h1>
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <ToastContainer position="top-right" autoClose={2000} />
 
-      <div className="flex">
-        <div className="flex justify-center items-center bg-gray-500 border-r-8 border-black h-150 w-150 text-white">
-          <form
-            onSubmit={(e) => {
-              sub(e);
-            }}
-            className="bg-black h-100 w-80 p-5 rounded-2xl"
-          >
-            <h1 className="flex justify-center font-black">Enter task</h1>
-            <input
-              onChange={(t) => {
-                settask(t.target.value);
-              }}
-              value={task}
-              type="text"
-              placeholder="Enter your work"
-              className="bg-amber-50 w-65 text-black m-2 p-3 rounded-2xl"
-            />
-            <textarea
-              onChange={(d) => {
-                setdetail(d.target.value);
-              }}
-              value={detail}
-              placeholder="Enter details"
-              className="bg-amber-50 h-50 w-65 m-2 p-3 text-black rounded-2xl"
-            />
-            <button className="bg-gray-800 p-2 m-2 hover:bg-gray-700 rounded-2xl">
-              submit
-            </button>
-            <button
-              onClick={(l) => {
-                slc(l);
-              }}
-              className="bg-gray-800 p-2 m-2 hover:bg-gray-700 rounded-2xl"
-            >
-              local-save
-            </button>
-            <button
-              onClick={(c) => {
-                clr(c);
-              }}
-              className="bg-gray-800 p-2 hover:bg-gray-700 rounded-2xl"
-            >
-              clear-local
-            </button>
-            <button
-              onClick={(r) => {
-                retrive(r);
-              }}
-              className="bg-red-600 p-2 h-10 w-50 m-10 hover:bg-red-500 rounded-2xl"
-            >
-              retrive-previous
-            </button>
-          </form>
-        </div>
+      <Navbar totalNotes={notes.length} />
 
-        <div className="bg-amber-500 grid grid-cols-4  w-350 p-5">
-          {arr.map((i, k) => {
-            return (
-              <div key={k} className="flex flex-col justify-between">
-                <div className="min-h-50 h-fit w-fit p-2 m-3 bg-amber-200 rounded-2xl">
-                  <h1 className="flex justify-center h-7 min-w-40 w-fit font-extrabold">
-                    {i.head}
-                  </h1>
-                  <p className="border-t-4 border-white font-bold">{i.body}</p>
-                  <div className="flex justify-center mt-25">
-                    <button
-                      onClick={() => {
-                        del(k);
-                      }}
-                      className="bg-red-600 hover:bg-red-500 h-10 w-30 p-2 rounded-2xl"
-                    >
-                      delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="max-w-7xl mx-auto p-5">
+        <SearchBar search={search} setSearch={setSearch} />
+
+        <NoteForm
+          title={title}
+          setTitle={setTitle}
+          description={description}
+          setDescription={setDescription}
+          category={category}
+          setCategory={setCategory}
+          handleSubmit={handleSubmit}
+          editId={editId}
+        />
+
+        {filteredNotes.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-8">
+            {filteredNotes.map((note) => (
+              <NoteCard
+                key={note.id}
+                note={note}
+                handleDelete={handleDelete}
+                handleEdit={handleEdit}
+                togglePin={togglePin}
+              />
+            ))}
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 };
 
